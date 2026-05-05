@@ -17,6 +17,8 @@
     "JWT_EXPIRES_IN",
     "BCRYPT_ROUNDS",
     "AI_PROVIDER",
+    "GROQ_API_KEY",
+    "GROQ_MODEL",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY"
   ],

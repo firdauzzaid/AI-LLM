@@ -2,10 +2,19 @@
   "name": "lead-workflow",
   "version": "0.0.0",
   "private": true,
+  "packageManager": "npm@11.6.1",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.7.4"
+  },
   "dependencies": {
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1"
