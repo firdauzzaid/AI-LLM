@@ -4,5 +4,5 @@ buildCommand = "npm install --ignore-scripts && npx turbo run build --filter=@re
 
 [deploy]
 startCommand = "cd apps/api && npx prisma migrate deploy && node dist/main"
-restartPolicyType = "on-failure"
+restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
