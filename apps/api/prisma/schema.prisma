@@ -1,0 +1,195 @@
+// ============================================================================
+// PRISMA SCHEMA
+// Lead Workflow System
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+/// Status keseluruhan workflow
+enum WorkflowStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("workflow_status")
+}
+
+/// Status per step dalam workflow
+enum StepStatus {
+  NOT_STARTED
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED
+
+  @@map("step_status")
+}
+
+/// Nama step dalam workflow (fixed, sesuai requirement)
+enum StepName {
+  INTENT_CLASSIFICATION
+  DATA_EXTRACTION
+  ROUTING_DECISION
+
+  @@map("step_name")
+}
+
+/// Channel asal lead message
+enum ContactChannel {
+  WHATSAPP
+  WEBCHAT
+  EMAIL
+  OTHER
+
+  @@map("contact_channel")
+}
+
+/// Kategori intent hasil klasifikasi AI
+enum IntentCategory {
+  SALES_NEW
+  SALES_EXISTING
+  SUPPORT
+  SPAM
+  UNKNOWN
+
+  @@map("intent_category")
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+/// User model - untuk authentication
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  leads     Lead[]
+  workflows Workflow[]
+
+  @@index([email])
+  @@map("users")
+}
+
+/// Lead model - raw inbound message dari customer
+model Lead {
+  id              String         @id @default(cuid())
+  userId          String         @map("user_id")
+  customerName    String?        @map("customer_name")
+  contactChannel  ContactChannel @map("contact_channel")
+  rawMessage      String         @map("raw_message") @db.Text
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflow Workflow?
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+/// Workflow instance - satu per lead
+model Workflow {
+  id        String         @id @default(cuid())
+  leadId    String         @unique @map("lead_id")
+  userId    String         @map("user_id")
+  status    WorkflowStatus @default(PENDING)
+
+  // Final aggregated output setelah semua step selesai (untuk quick access)
+  finalCategory IntentCategory? @map("final_category")
+  finalQueue    String?         @map("final_queue")
+  finalPriority String?         @map("final_priority")
+
+  // Error info kalau workflow failed
+  failureReason String? @map("failure_reason") @db.Text
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Relations
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead  Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  steps WorkflowStep[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("workflows")
+}
+
+/// Workflow step - 3 baris per workflow
+model WorkflowStep {
+  id         String     @id @default(cuid())
+  workflowId String     @map("workflow_id")
+  stepName   StepName   @map("step_name")
+  status     StepStatus @default(NOT_STARTED)
+
+  // Input yang dikirim ke AI (untuk debugging & replay)
+  input Json?
+
+  // Output validated dari AI
+  output Json?
+
+  // Raw response dari AI provider (untuk audit)
+  rawAiResponse Json? @map("raw_ai_response")
+
+  // Error info kalau step failed
+  errorReason String? @map("error_reason") @db.Text
+  retryCount  Int     @default(0) @map("retry_count")
+
+  // Timestamps
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, stepName])
+  @@index([workflowId])
+  @@index([status])
+  @@map("workflow_steps")
+}
+
+/// AI call log - audit trail untuk setiap panggilan ke AI provider
+/// Berguna untuk debugging, cost tracking, dan compliance
+model AiCallLog {
+  id             String   @id @default(cuid())
+  workflowId     String?  @map("workflow_id")
+  workflowStepId String?  @map("workflow_step_id")
+  provider       String   // "openai" | "anthropic" | "gemini" (string, bukan enum, supaya flexible)
+  model          String   // "gpt-4o" | "claude-sonnet-4" | etc
+  promptTokens   Int?     @map("prompt_tokens")
+  completionTokens Int?   @map("completion_tokens")
+  totalTokens    Int?     @map("total_tokens")
+  latencyMs      Int?     @map("latency_ms")
+  success        Boolean
+  errorMessage   String?  @map("error_message") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([workflowId])
+  @@index([workflowStepId])
+  @@index([createdAt])
+  @@map("ai_call_logs")
+}
