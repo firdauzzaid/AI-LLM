@@ -10,6 +10,7 @@ export const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   API_PORT: z.coerce.number().int().positive().default(3000),
+  FRONTEND_URL: z.string().url().optional(),
 
   // ========================================
   // DATABASE
@@ -18,7 +19,7 @@ export const envSchema = z.object({
   POSTGRES_HOST: z.string().default("localhost"),
   POSTGRES_PORT: z.coerce.number().int().positive().default(5432),
   POSTGRES_USER: z.string().default("postgres"),
-  POSTGRES_PASSWORD: z.string(),
+  POSTGRES_PASSWORD: z.string().optional(),
   POSTGRES_DB: z.string().default("lead_workflow"),
 
   // ========================================

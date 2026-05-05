@@ -12,10 +12,11 @@ async function bootstrap(): Promise<void> {
   });
 
   const configService = app.get(ConfigService<EnvConfig, true>);
-  const port = configService.get("API_PORT", { infer: true });
+  // Railway/Render inject PORT; fall back to API_PORT then hardcoded default
+  const port = process.env.PORT ?? configService.get("API_PORT", { infer: true }) ?? 3000;
   const nodeEnv = configService.get("NODE_ENV", { infer: true });
+  const frontendUrl = configService.get("FRONTEND_URL", { infer: true });
 
-  // Global validation pipe (untuk DTO non-Zod nanti kalau ada)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -24,9 +25,8 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Enable CORS (nanti kita tighten ketika frontend ready)
   app.enableCors({
-    origin: nodeEnv === "development" ? true : false,
+    origin: nodeEnv === "development" ? true : (frontendUrl ?? false),
     credentials: true,
   });
 
